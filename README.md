@@ -70,7 +70,9 @@ The program will list the files with specified extensions modified within the sp
 Ensure that the `extensions.txt`, `latest.config`, and `ignore_me.txt` files are present in the appropriate directory structure to define the configuration for paths, extensions, and ignored folders.
 
 ~/.latest/config/extensions.txt
+
 ~/.latest/config/latest.config
+
 ~/.latest/config/ignore_me.txt
 
 
