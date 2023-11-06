@@ -1,0 +1,23 @@
+# Use a base image with the necessary build tools (e.g., GCC) and libraries
+FROM gcc:latest
+ENV DOCKERHOME=/app/a
+ENV DOCKER_NAME_SWAP=/Users/luisrueda
+
+RUN apt-get update && apt-get install -y gdb
+
+# Set the working directory within the container
+WORKDIR /app
+
+# Copy your source code into the container
+COPY src/ /app/src/
+COPY compile_latest_docker.sh /app/
+COPY src/latest.c /app/
+COPY src/latest.h /app/
+
+# Compile your application
+RUN chmod +x compile_latest_docker.sh
+RUN ./compile_latest_docker.sh
+
+# Specify the command to run your application (e.g., ./your_executable)
+ENTRYPOINT ["./latest"]
+

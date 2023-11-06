@@ -14,6 +14,8 @@
 #include <unistd.h>
 #endif
 
+#define MY_PATH_MAX 4500
+
 void get_home_directory(char *path) {
 #ifdef _WIN32
     // Windows - HOME environment variable
@@ -22,9 +24,17 @@ void get_home_directory(char *path) {
     if (home_drive && home_path) {
         sprintf(path, "%s%s", home_drive, home_path);
     }
-#else
+#endif
+#ifdef MAC
     // Linux and macOS - HOME environment variable
     const char *home_path = getenv("HOME");
+    if (home_path) {
+        strcpy(path, home_path);
+    }
+#endif
+#ifdef DOCKER
+    // Linux and macOS - HOME environment variable
+    const char *home_path = getenv("DOCKERHOME");
     if (home_path) {
         strcpy(path, home_path);
     }
@@ -33,7 +43,7 @@ void get_home_directory(char *path) {
 
 void read_ignore_list(const char *ignore_file, char *ignore_list[], int *num_ignore) {
     // Construct the full path to ignore_file
-    char ignore_path[PATH_MAX];
+    char ignore_path[MY_PATH_MAX];
     get_home_directory(ignore_path);
     strcat(ignore_path, "/.latest/config/");
     strcat(ignore_path, ignore_file);
@@ -63,11 +73,11 @@ void read_ignore_list(const char *ignore_file, char *ignore_list[], int *num_ign
 
 void read_paths_from_file(const char *config_file, char *paths[], int *num_paths) {
     // Construct the full path to config_file
-    char config_path[PATH_MAX];
+    char config_path[MY_PATH_MAX];
     get_home_directory(config_path);
     strcat(config_path, "/.latest/config/");
     strcat(config_path, config_file);
-
+    
     FILE *file = fopen(config_path, "r");
     if (!file) {
         perror("Could not open config file");
@@ -93,7 +103,7 @@ void read_paths_from_file(const char *config_file, char *paths[], int *num_paths
 
 void read_extensions_from_file(const char *extensions_file, char *extensions[], int *num_extensions) {
     // Construct the full path to extensions_file
-    char extensions_path[PATH_MAX];
+    char extensions_path[MY_PATH_MAX];
     get_home_directory(extensions_path);
     strcat(extensions_path, "/.latest/config/");
     strcat(extensions_path, extensions_file);
@@ -133,11 +143,15 @@ int is_ignored(const char *dirname, char *ignore_list[], int num_ignore) {
 void list_files_recursive(const char *path, char *ignore_list[], int num_ignore, char *extensions[], int num_extensions, int hours) {
     DIR *dir = opendir(path);
     if (!dir) {
-        perror("Could not open directory");
+        perror("\n***START****\n");
+        perror("\nCould not open directory\n");
+        printf("\npath=%s\n", path);
+        perror("\n***END****\n");
         return;
     }
 
     struct dirent *entry;
+    char ignore_path[MY_PATH_MAX];
     while ((entry = readdir(dir))) {
         if (entry->d_type == DT_DIR) {
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
@@ -163,7 +177,12 @@ void list_files_recursive(const char *path, char *ignore_list[], int num_ignore,
                             time_t modification_time = file_stat.st_mtime;
                             int hours_since_modification = (current_time - modification_time) / 3600;
                             if (hours_since_modification <= hours) {
-                                printf("%s\n", full_path);
+                                char* name_swap = getenv("DOCKER_NAME_SWAP");
+                                char* docker_home = getenv("DOCKERHOME");
+                                memset(ignore_path, '\0', sizeof(ignore_path));
+                                strcat(ignore_path, name_swap);
+                                strcat(ignore_path, full_path + strlen(docker_home));
+                                printf("%s (%d)\n", ignore_path, hours_since_modification);
                             }
                         }
                         break;  // Extension found, no need to check further
@@ -176,6 +195,7 @@ void list_files_recursive(const char *path, char *ignore_list[], int num_ignore,
     closedir(dir);
 }
 
+#ifdef COMPILE
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         printf("Usage: %s <hours>\n", argv[0]);
@@ -199,11 +219,24 @@ int main(int argc, char *argv[]) {
     int num_extensions = 0;
     read_extensions_from_file("extensions.txt", extensions, &num_extensions);
 
+#ifdef DOCKER
+    char ignore_path[MY_PATH_MAX];
+    char* name_swap = getenv("DOCKER_NAME_SWAP");
+    for (int i = 0; i < num_paths; i++) {
+        memset(ignore_path, '\0', sizeof(ignore_path));
+        get_home_directory(ignore_path);
+        strcat(ignore_path, paths[i] + strlen(name_swap));
+        printf("Files in %s modified within the last %d hours:\n", paths[i], hours);
+        list_files_recursive(ignore_path, ignore_list, num_ignore, extensions, num_extensions, hours);
+        printf("\n");
+    }
+#else
     for (int i = 0; i < num_paths; i++) {
         printf("Files in %s modified within the last %d hours:\n", paths[i], hours);
         list_files_recursive(paths[i], ignore_list, num_ignore, extensions, num_extensions, hours);
         printf("\n");
     }
+#endif
 
     // Free allocated memory for ignore_list, paths, and extensions
     for (int i = 0; i < num_ignore; i++) {
@@ -220,3 +253,4 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+#endif
