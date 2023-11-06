@@ -7,24 +7,9 @@
 #include <time.h>
 #include <limits.h>
 
-#ifdef _WIN32
-#include <direct.h>
-#define getcwd _getcwd
-#else
-#include <unistd.h>
-#endif
-
 #define MY_PATH_MAX 4500
 
 void get_home_directory(char *path) {
-#ifdef _WIN32
-    // Windows - HOME environment variable
-    const char *home_drive = getenv("HOMEDRIVE");
-    const char *home_path = getenv("HOMEPATH");
-    if (home_drive && home_path) {
-        sprintf(path, "%s%s", home_drive, home_path);
-    }
-#endif
 #ifdef MAC
     // Linux and macOS - HOME environment variable
     const char *home_path = getenv("HOME");
